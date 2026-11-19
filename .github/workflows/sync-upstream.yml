@@ -1,0 +1,69 @@
+# Ambil versi terbaru Catetin ke repo kamu.
+# Cara pakai: tab Actions → "Ambil update Catetin" → Run workflow.
+# Setelah selesai, Cloudflare otomatis deploy ulang. Lalu buka https://<alamat-worker>/setup sekali.
+#
+# wrangler.jsonc milikmu TIDAK ditimpa, karena berisi ID database D1 milikmu.
+name: Ambil update Catetin
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  UPSTREAM: https://github.com/judienmz/Catetin.git
+  # Folder yang sepenuhnya mengikuti versi resmi (file yang dihapus di versi resmi ikut dihapus).
+  MANAGED_DIRS: worker miniapp migrations shared test
+
+jobs:
+  sync:
+    # Tidak perlu jalan di repo resmi itu sendiri.
+    if: github.repository != 'judienmz/Catetin'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ambil versi terbaru
+        run: |
+          set -euo pipefail
+          git config user.name "catetin-update"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream "$UPSTREAM"
+          git fetch --depth=1 upstream main
+
+          cp wrangler.jsonc "$RUNNER_TEMP/wrangler.keep"
+
+          # Hapus file di folder terkelola yang sudah tidak ada di versi resmi
+          for dir in $MANAGED_DIRS; do
+            comm -23 \
+              <(git ls-files "$dir" | sort) \
+              <(git ls-tree -r --name-only FETCH_HEAD -- "$dir" | sort) \
+              | xargs -r git rm -q --
+          done
+
+          # Timpa semua file dengan versi resmi, kecuali wrangler.jsonc
+          git checkout FETCH_HEAD -- .
+          cp "$RUNNER_TEMP/wrangler.keep" wrangler.jsonc
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "✅ Sudah versi terbaru, tidak ada yang berubah." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          if ! git diff --quiet FETCH_HEAD -- wrangler.jsonc; then
+            {
+              echo "⚠️ wrangler.jsonc di versi resmi berbeda dari milikmu dan TIDAK ditimpa (supaya ID database aman)."
+              echo "Baca catatan rilis di README; bila ada pengaturan baru, salin manual."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          git commit -q -m "Update Catetin ke $(git rev-parse --short FETCH_HEAD)"
+          git push
+          {
+            echo "✅ Update diambil. Cloudflare akan deploy ulang otomatis dalam 1–2 menit."
+            echo "Setelah itu buka https://<alamat-worker>/setup dan jalankan setup sekali (untuk migrasi database)."
+          } >> "$GITHUB_STEP_SUMMARY"
