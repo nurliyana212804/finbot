@@ -19,8 +19,8 @@ import {
   voidCashTransaction,
 } from "../../services/cash";
 import { createSale, getSale, listSales, voidSale } from "../../services/sales";
-import { createProduct, listProducts, updateProduct } from "../../services/products";
-import { cashflow, daily, itemsSold, profitLoss, summary } from "../../services/reports";
+import { createProduct, deleteProduct, listProducts, updateProduct } from "../../services/products";
+import { cashByAccount, cashflow, daily, itemsSold, profitLoss, summary } from "../../services/reports";
 import { sendExport } from "../../bot/commands/reports";
 import { botCommands } from "../../bot/commands/list";
 import { listMovements, lowStock, setStockCount } from "../../services/stock";
@@ -86,6 +86,23 @@ api.get("/meta", async (c) => {
 });
 
 // --- Kas ---------------------------------------------------------------------
+
+/** Kas masuk/keluar per akun (tanpa transfer) + saldo per akun. Staff tidak menerima saldo. */
+api.get("/cash/summary", async (c) => {
+  const q = parseQuery(c, ListQuery);
+  const r = ymdRange(q);
+  const s = await cashByAccount(c.env.DB, r.from, r.to);
+  if (c.var.user.role === "staff") {
+    return ok(c, {
+      from: s.from,
+      to: s.to,
+      totalMasuk: s.totalMasuk,
+      totalKeluar: s.totalKeluar,
+      akun: s.akun.map(({ id, name, masuk, keluar }) => ({ id, name, masuk, keluar })),
+    });
+  }
+  return ok(c, s);
+});
 
 api.get("/cash", async (c) => {
   const q = parseQuery(c, CashListQuery);
@@ -209,6 +226,12 @@ api.patch("/products/:id", async (c) => {
       c.var.actor,
     ),
   );
+});
+
+api.delete("/products/:id", async (c) => {
+  requireAdmin(c);
+  await deleteProduct(c.env.DB, Number(c.req.param("id")), c.var.actor);
+  return ok(c, { deleted: true });
 });
 
 // --- Modul stok ----------------------------------------------------------------

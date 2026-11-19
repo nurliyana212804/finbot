@@ -5,7 +5,7 @@ import { takeAmount } from "../parsers/amount";
 import { matchLeading } from "../parsers/match";
 import { html, rupiah } from "../format";
 import { actorOf, canSeeCost, guard, isAdmin, words } from "../drafts";
-import { createProduct, listProducts, updateProduct, type Product } from "../../services/products";
+import { createProduct, deleteProduct, listProducts, updateProduct, type Product } from "../../services/products";
 
 const KEYWORDS: Record<string, "cost" | "sell"> = { hpp: "cost", modal: "cost", jual: "sell", harga: "sell" };
 
@@ -14,6 +14,7 @@ const HELP = [
   "<code>/produk</code>: daftar produk",
   "<code>/produk tambah &lt;nama&gt; hpp &lt;nominal&gt; jual &lt;nominal&gt;</code>",
   "<code>/produk ubah &lt;nama&gt; [hpp &lt;nominal&gt;] [jual &lt;nominal&gt;]</code>",
+  "<code>/produk hapus &lt;nama&gt;</code>: nonaktifkan (penjualan lama tetap ada)",
   "Contoh: <code>/produk tambah Salep Kulit hpp 12rb jual 20rb</code>",
 ].join("\n");
 
@@ -56,6 +57,21 @@ async function produk(ctx: BotContext): Promise<void> {
   const ws = words(typeof ctx.match === "string" ? ctx.match : "");
   const sub = ws[0]?.toLowerCase();
   const db = ctx.env.DB;
+
+  if (sub === "hapus") {
+    if (!isAdmin(ctx)) {
+      await ctx.reply("Hanya owner/admin yang bisa mengelola produk.");
+      return;
+    }
+    const m = matchLeading(ws.slice(1), await listProducts(db));
+    if (!m.match || m.rest.length > 0) {
+      await ctx.reply("Produk tidak ditemukan (atau namanya kurang lengkap). Lihat daftar dengan /produk.");
+      return;
+    }
+    await deleteProduct(db, m.match.id, actorOf(ctx));
+    await ctx.reply(`🗑 Produk <b>${html(m.match.name)}</b> dihapus. Penjualan lama tetap tercatat.`, { parse_mode: "HTML" });
+    return;
+  }
 
   if (sub === "tambah" || sub === "ubah") {
     if (!isAdmin(ctx)) {

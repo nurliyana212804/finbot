@@ -3,6 +3,7 @@
  * baris anak merujuk induk lewat (SELECT id FROM sales WHERE uid = ?), invoice & HPP dihitung di SQL.
  */
 import { AppError } from "../lib/errors";
+import { txDateError } from "../lib/date";
 import { newUid } from "../lib/crypto";
 import { MAX_AMOUNT } from "../bot/parsers/amount";
 import { getAccount, type Actor, type Source } from "./cash";
@@ -116,7 +117,8 @@ export async function createSale(db: D1Database, input: NewSaleInput, actor: Act
   if (existing) return existing;
 
   // ---- validasi ----
-  if (!YMD.test(input.tanggal)) throw new AppError("INVALID_DATE", "Format tanggal harus YYYY-MM-DD.");
+  const dateErr = txDateError(input.tanggal);
+  if (dateErr) throw new AppError("INVALID_DATE", dateErr);
   if (input.items.length < 1 || input.items.length > MAX_ITEMS) throw new AppError("INVALID_ITEMS", `Penjualan harus berisi 1–${MAX_ITEMS} item.`);
   const discount = input.discount ?? 0;
   money(discount, "Diskon");

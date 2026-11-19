@@ -3,6 +3,7 @@ import { api, type Product } from "../api";
 import { pct, rupiah } from "../format";
 import { Empty, ErrorBox, Field, Loading, MoneyInput, PrimaryAction, Row, Section, Segmented, useApp, useAsync, useSaver, type AppCtx } from "../ui";
 import { StockView } from "./Stock";
+import { confirmDialog } from "../tg";
 
 function openProductForm(app: AppCtx, product?: Product): void {
   app.push({ key: `product-${product?.id ?? "new"}-${Date.now()}`, title: product ? "Ubah produk" : "Produk baru", render: () => <ProductForm product={product} /> });
@@ -150,6 +151,22 @@ function ProductForm({ product }: { product?: Product }) {
         </Section>
       ) : null}
       {product ? <p class="footnote">Mengubah harga tidak mengubah penjualan yang sudah tercatat.{stockOn ? " Ubah jumlah stok lewat Stok → Stok opname." : ""}</p> : null}
+      {product ? (
+        <button
+          class="btn danger block"
+          disabled={busy}
+          onClick={async () => {
+            if (!(await confirmDialog(`Hapus produk "${product.name}"? Penjualan lama tetap tercatat.`))) return;
+            await run(async () => {
+              await api.deleteProduct(product.id);
+              app.bump();
+              app.pop();
+            }, "Produk dihapus");
+          }}
+        >
+          Hapus produk
+        </button>
+      ) : null}
       <PrimaryAction text="Simpan" onClick={save} disabled={!name.trim() || sell <= 0} busy={busy} />
     </div>
   );

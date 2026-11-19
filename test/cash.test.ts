@@ -147,7 +147,7 @@ describe("services/cash", () => {
   it("saldo sampai tanggal tertentu mengabaikan transaksi sesudahnya", async () => {
     const cat = await catId("Modal Masuk");
     await createCashTransaction(env.DB, { tanggal: "2026-11-01", direction: "in", amount: 100_000, categoryId: cat, accountId: TUNAI, source: "bot" }, owner);
-    await createCashTransaction(env.DB, { tanggal: "2026-11-20", direction: "in", amount: 50_000, categoryId: cat, accountId: TUNAI, source: "bot" }, owner);
+    await createCashTransaction(env.DB, { tanggal: "2026-11-15", direction: "in", amount: 50_000, categoryId: cat, accountId: TUNAI, source: "bot" }, owner);
     expect((await accountBalances(env.DB, "2026-11-10"))[0]!.balance).toBe(100_000);
     expect((await accountBalances(env.DB))[0]!.balance).toBe(150_000);
   });

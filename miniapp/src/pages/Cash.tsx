@@ -2,6 +2,7 @@ import { useMemo, useState } from "preact/hooks";
 import { api, type CashRow, type Direction } from "../api";
 import { hariTgl, newUid, PERIOD_LABEL, periodRange, rupiah, type PeriodKey } from "../format";
 import { confirmDialog } from "../tg";
+import { CashByAccountCard } from "../components/CashByAccount";
 import { Chips, Empty, ErrorBox, Field, Loading, MoneyInput, PrimaryAction, Row, Section, Segmented, useApp, useAsync, useSaver, type AppCtx } from "../ui";
 
 const LIST_PERIODS: PeriodKey[] = ["bulan", "minggu", "hari", "bulanlalu"];
@@ -39,17 +40,6 @@ export function CashPage() {
     const m = new Map<string, CashRow[]>();
     for (const r of data?.items ?? []) m.set(r.tanggal, [...(m.get(r.tanggal) ?? []), r]);
     return [...m.entries()];
-  }, [data]);
-
-  const totals = useMemo(() => {
-    let masuk = 0;
-    let keluar = 0;
-    for (const r of data?.items ?? []) {
-      if (r.status !== "posted" || r.ref_type === "transfer") continue;
-      if (r.direction === "in") masuk += r.amount;
-      else keluar += r.amount;
-    }
-    return { masuk, keluar };
   }, [data]);
 
   return (
@@ -94,16 +84,8 @@ export function CashPage() {
         />
       </div>
 
-      {data && !loading ? (
-        <div class="totals">
-          <span>
-            Masuk <b class="pos">{rupiah(totals.masuk)}</b>
-          </span>
-          <span>
-            Keluar <b class="neg">{rupiah(totals.keluar)}</b>
-          </span>
-        </div>
-      ) : null}
+      {/* Total dari server (semua halaman), bukan hanya baris yang sedang dimuat */}
+      <CashByAccountCard from={range.from} to={range.to} title={`Ringkasan ${PERIOD_LABEL[period].toLowerCase()}`} />
 
       {loading && !data ? (
         <Loading />

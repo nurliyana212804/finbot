@@ -163,3 +163,19 @@ export async function updateProduct(db: D1Database, id: number, input: UpdatePro
   const results = await db.batch(stmts);
   return results[results.length - 1]!.results[0] as Product;
 }
+
+/**
+ * Hapus produk = nonaktifkan (penjualan & riwayat lama tetap merujuknya).
+ * Produk nonaktif tidak muncul di daftar, /jual, maupun restock; namanya boleh dipakai lagi.
+ */
+export async function deleteProduct(db: D1Database, id: number, actor: Actor): Promise<void> {
+  assertAdmin(actor);
+  const p = await getProduct(db, id);
+  if (!p || !p.is_active) throw new AppError("NOT_FOUND", "Produk tidak ditemukan.", 404);
+  await db.batch([
+    db.prepare("UPDATE products SET is_active = 0, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?1").bind(id),
+    db
+      .prepare("INSERT INTO audit_log (user_id, action, entity, entity_id, payload) VALUES (?1, 'product.delete', 'products', ?2, ?3)")
+      .bind(actor.id, id, JSON.stringify({ name: p.name, stock: p.stock })),
+  ]);
+}

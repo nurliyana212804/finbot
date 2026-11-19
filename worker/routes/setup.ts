@@ -67,6 +67,45 @@ function reportPage(r: SetupReport): string {
 
 export const setupRoutes = new Hono<{ Bindings: Env }>();
 
+// --- Pembatas tebakan SETUP_KEY ------------------------------------------------
+// Penghitung global per jam di tabel settings (`setup_fail` = "<jam UTC>|<jumlah>").
+// Sebelum /setup pertama tabel settings belum ada → pembatas dilewati (hanya jeda waktu).
+
+export const FAIL_DELAY_MS = 1500;
+export const MAX_FAILS_PER_HOUR = 20;
+
+function hourStamp(now: Date): string {
+  return now.toISOString().slice(0, 13);
+}
+
+async function setupLocked(db: D1Database, now: Date = new Date()): Promise<boolean> {
+  try {
+    const row = await db.prepare("SELECT value FROM settings WHERE key = 'setup_fail'").first<{ value: string }>();
+    if (!row) return false;
+    const [hour, n] = row.value.split("|");
+    return hour === hourStamp(now) && Number(n) >= MAX_FAILS_PER_HOUR;
+  } catch {
+    return false;
+  }
+}
+
+async function recordSetupFailure(db: D1Database, now: Date = new Date()): Promise<void> {
+  const h = hourStamp(now);
+  try {
+    await db
+      .prepare(
+        `INSERT INTO settings (key, value) VALUES ('setup_fail', ?1 || '|1')
+         ON CONFLICT(key) DO UPDATE SET value = CASE
+           WHEN substr(value, 1, 13) = ?1 THEN ?1 || '|' || (CAST(substr(value, 15) AS INTEGER) + 1)
+           ELSE ?1 || '|1' END`,
+      )
+      .bind(h)
+      .run();
+  } catch {
+    // tabel belum ada: abaikan
+  }
+}
+
 setupRoutes.get("/setup", (c) => c.html(formPage()));
 
 setupRoutes.post("/setup", async (c) => {
@@ -77,9 +116,15 @@ setupRoutes.post("/setup", async (c) => {
   if (!env.BOT_TOKEN) {
     return c.html(formPage("BOT_TOKEN belum diisi. Atur di dashboard Cloudflare (Settings → Variables and Secrets)."), 500);
   }
+  if (await setupLocked(env.DB)) {
+    return c.html(formPage("Terlalu banyak percobaan salah. Coba lagi jam berikutnya."), 429);
+  }
   const form = await c.req.parseBody();
   const key = typeof form["key"] === "string" ? form["key"] : "";
   if (!(await safeEqual(key, env.SETUP_KEY))) {
+    await recordSetupFailure(env.DB);
+    // Perlambat tebak-tebakan password (waktu tunggu, bukan CPU).
+    await new Promise((r) => setTimeout(r, FAIL_DELAY_MS));
     return c.html(formPage("SETUP_KEY salah."), 401);
   }
   const origin = new URL(c.req.url).origin;

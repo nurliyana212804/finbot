@@ -4,6 +4,7 @@ import { BarChart, Empty, ErrorBox, Loading, Row, Section, useApp, useAsync } fr
 import { openCashForm } from "./Cash";
 import { openCartForm, openQuickSale } from "./Sales";
 import { openSettings } from "./Settings";
+import { CashByAccountCard } from "../components/CashByAccount";
 
 function delta(now: number, prev: number | undefined): { text: string; cls: string } | null {
   if (prev === undefined) return null;
@@ -90,6 +91,8 @@ export function Home({ goTo }: { goTo: (tab: string) => void }) {
               </p>
             ) : null}
           </Section>
+
+          <CashByAccountCard from={`${meta.today.slice(0, 8)}01`} to={meta.today} title="Kas bulan ini" />
 
           <Section title="Omzet 30 hari">
             <BarChart data={data.chart.map((d) => ({ tanggal: d.tanggal, value: d.omzet }))} label="Grafik omzet harian 30 hari terakhir" />

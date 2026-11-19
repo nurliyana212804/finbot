@@ -396,3 +396,63 @@ export async function summary(db: D1Database, today: string, opts: { stock: bool
     lowStock: low ? low.results : null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Ringkasan kas per akun (kartu Kas masuk / keluar di Beranda & halaman Kas)
+// ---------------------------------------------------------------------------
+
+export interface AccountCashRow {
+  id: number;
+  name: string;
+  /** Kas masuk dalam periode, TANPA transfer antar akun. */
+  masuk: number;
+  /** Kas keluar dalam periode, TANPA transfer antar akun. */
+  keluar: number;
+  /** Saldo akun di akhir periode (termasuk transfer & saldo awal). */
+  saldo: number;
+}
+
+export interface CashByAccount {
+  from: string;
+  to: string;
+  totalMasuk: number;
+  totalKeluar: number;
+  totalSaldo: number;
+  akun: AccountCashRow[];
+}
+
+/**
+ * Masuk/keluar per akun untuk satu periode. Transfer antar akun tidak dihitung sebagai
+ * masuk/keluar (hanya memindah uang), tapi tetap memengaruhi saldo tiap akun.
+ * Akun nonaktif ikut tampil bila punya transaksi di periode itu.
+ */
+export async function cashByAccount(db: D1Database, from: string, to: string): Promise<CashByAccount> {
+  assertRange(from, to);
+  const { results } = await db
+    .prepare(
+      `SELECT a.id, a.name,
+         COALESCE((SELECT SUM(t.amount) FROM cash_transactions t
+                   WHERE t.account_id = a.id AND t.status = 'posted' AND t.direction = 'in'
+                     AND t.ref_type <> 'transfer' AND t.tanggal BETWEEN ?1 AND ?2), 0) AS masuk,
+         COALESCE((SELECT SUM(t.amount) FROM cash_transactions t
+                   WHERE t.account_id = a.id AND t.status = 'posted' AND t.direction = 'out'
+                     AND t.ref_type <> 'transfer' AND t.tanggal BETWEEN ?1 AND ?2), 0) AS keluar,
+         a.opening_balance + COALESCE((SELECT SUM(CASE t.direction WHEN 'in' THEN t.amount ELSE -t.amount END)
+                   FROM cash_transactions t
+                   WHERE t.account_id = a.id AND t.status = 'posted' AND t.tanggal <= ?2), 0) AS saldo
+       FROM accounts a
+       WHERE a.is_active = 1 OR EXISTS (SELECT 1 FROM cash_transactions
+                                        WHERE account_id = a.id AND status = 'posted' AND tanggal BETWEEN ?1 AND ?2)
+       ORDER BY a.id`,
+    )
+    .bind(from, to)
+    .all<AccountCashRow>();
+  return {
+    from,
+    to,
+    totalMasuk: results.reduce((n, r) => n + r.masuk, 0),
+    totalKeluar: results.reduce((n, r) => n + r.keluar, 0),
+    totalSaldo: results.reduce((n, r) => n + r.saldo, 0),
+    akun: results,
+  };
+}

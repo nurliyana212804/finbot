@@ -3,6 +3,7 @@
  * Aturan: ARCHITECTURE.md §9.0 (pola batch) & §9.3 (kas manual).
  */
 import { AppError } from "../lib/errors";
+import { txDateError } from "../lib/date";
 import { newUid } from "../lib/crypto";
 import { MAX_AMOUNT } from "../bot/parsers/amount";
 import type { Role } from "./users";
@@ -68,6 +69,11 @@ function assertAmount(amount: number): void {
   if (!Number.isSafeInteger(amount) || amount <= 0 || amount > MAX_AMOUNT) {
     throw new AppError("INVALID_AMOUNT", "Nominal harus bilangan bulat rupiah lebih dari 0.");
   }
+}
+
+function assertTxDate(tanggal: string): void {
+  const err = txDateError(tanggal);
+  if (err) throw new AppError("INVALID_DATE", err);
 }
 
 function assertDate(tanggal: string): void {
@@ -210,7 +216,7 @@ export async function createCashTransaction(db: D1Database, input: NewCashInput,
   if (existing) return existing;
 
   assertAmount(input.amount);
-  assertDate(input.tanggal);
+  assertTxDate(input.tanggal);
   const description = input.description?.trim() || null;
   if (description && description.length > 200) throw new AppError("INVALID_NOTE", "Catatan maksimal 200 karakter.");
 
@@ -290,7 +296,7 @@ export async function createTransfer(db: D1Database, input: NewTransferInput, ac
   }
 
   assertAmount(input.amount);
-  assertDate(input.tanggal);
+  assertTxDate(input.tanggal);
   if (input.fromAccountId === input.toAccountId) throw new AppError("SAME_ACCOUNT", "Akun asal dan tujuan tidak boleh sama.");
   const [from, to] = await Promise.all([getAccount(db, input.fromAccountId), getAccount(db, input.toAccountId)]);
   if (!from || !from.is_active || !to || !to.is_active) throw new AppError("INVALID_ACCOUNT", "Akun kas tidak ditemukan.");

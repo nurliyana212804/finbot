@@ -420,6 +420,8 @@ Semua respons berbentuk JSON `{ ok: true, data }` atau `{ ok: false, error: { co
 | GET | `/api/products` | semua | `?q=&active=` |
 | POST | `/api/products` | admin+ | |
 | PATCH | `/api/products/:id` | admin+ | ubah HPP/harga → history |
+| DELETE | `/api/products/:id` | admin+ | nonaktifkan produk (penjualan lama tetap); juga `/produk hapus <nama>` di bot |
+| GET | `/api/cash/summary` | semua | `?from&to`: kas masuk/keluar per akun (tanpa transfer) + saldo per akun di akhir periode (saldo tidak dikirim ke staff) |
 | GET · GET :id · POST | `/api/purchases[/:id]` | admin+ | *(modul stok)* restock: `{ uid?, tanggal, supplier?, items:[{product_id, qty, unit_cost}], account_id, update_cost: average\|last\|none, note? }` → termasuk `hppChanges` |
 | POST | `/api/purchases/:id/void` | admin+ | *(modul stok)* stok & kas dibalik; HPP tidak dihitung ulang (ada `warnings`) |
 | POST | `/api/products/:id/stock` | admin+ | *(modul stok)* stok opname `{ actual, note?, tanggal? }` → `{ product, change }` |
@@ -480,6 +482,9 @@ Cron berjalan **setiap jam** (`0 * * * *`). Di dalam handler (semua jam & tangga
 
 - TypeScript `strict`. Tanpa `any` kecuali di batas eksternal.
 - **Uang = integer rupiah.** Tidak ada float di perhitungan uang. Format tampilan: `Rp 1.250.000`.
+- **Tanggal transaksi** (kas, penjualan, restock, opname) divalidasi `txDateError()` di `lib/date.ts`: harus tanggal kalender yang ada, ≥ 2000-01-01, dan **tidak melewati hari ini (WIB)**.
+- `/setup`: password salah diperlambat 1,5 detik; lebih dari 20 kali salah dalam satu jam (UTC) → dikunci (429) sampai jam berikutnya (`settings.setup_fail`).
+- `test/simulation.test.ts`: simulasi acak ±400 operasi (sebagian bersamaan) lalu mencocokkan silang semua laporan dengan hitungan langsung dari data mentah + invarian integritas (stok = Σ mutasi, kas penjualan/pembelian, pasangan transfer, invoice tanpa celah, audit). Jalankan setiap mengubah service atau query laporan.
 - **Tanggal:** semua "hari ini" & periode dihitung di zona `Asia/Jakarta` lewat helper `lib/date.ts`; jangan pakai `new Date().toISOString().slice(0,10)` (itu UTC).
 - Semua SQL memakai parameter binding (`?1`), tidak boleh string concat.
 - Operasi multi-tabel **wajib** memakai `env.DB.batch()` dengan pola §9.0.

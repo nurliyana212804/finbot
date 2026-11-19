@@ -176,3 +176,14 @@ export function wibDateTimeLabel(now: Date = new Date()): string {
   const mm = String(s.getUTCMinutes()).padStart(2, "0");
   return `${s.getUTCDate()} ${BULAN_PENDEK[s.getUTCMonth()]} ${s.getUTCFullYear()} ${hh}:${mm} WIB`;
 }
+
+/**
+ * Validasi tanggal transaksi: harus tanggal kalender yang ada, tidak sebelum 2000,
+ * dan tidak melewati hari ini (WIB). Mengembalikan pesan error, atau null bila sah.
+ */
+export function txDateError(tanggal: string, now: Date = new Date()): string | null {
+  if (!isValidYmd(tanggal)) return "Tanggal tidak valid (format YYYY-MM-DD).";
+  if (tanggal < "2000-01-01") return "Tanggal terlalu lama.";
+  if (tanggal > wibDate(now)) return "Tanggal tidak boleh melewati hari ini.";
+  return null;
+}

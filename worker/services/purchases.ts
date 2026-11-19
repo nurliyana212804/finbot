@@ -4,6 +4,7 @@
  * jadi UPDATE HPP dijalankan sebelum UPDATE stok).
  */
 import { AppError } from "../lib/errors";
+import { txDateError } from "../lib/date";
 import { newUid } from "../lib/crypto";
 import { MAX_AMOUNT } from "../bot/parsers/amount";
 import { getAccount, type Actor, type Source } from "./cash";
@@ -97,7 +98,8 @@ export async function createPurchase(db: D1Database, input: NewPurchaseInput, ac
   const existing = await db.prepare("SELECT * FROM purchases WHERE uid = ?1").bind(uid).first<Purchase>();
   if (existing) return detail(db, existing);
 
-  if (!YMD.test(input.tanggal)) throw new AppError("INVALID_DATE", "Format tanggal harus YYYY-MM-DD.");
+  const dateErr = txDateError(input.tanggal);
+  if (dateErr) throw new AppError("INVALID_DATE", dateErr);
   if (input.items.length < 1 || input.items.length > 50) throw new AppError("INVALID_ITEMS", "Pembelian harus berisi 1–50 item.");
   const updateCost: UpdateCost = input.updateCost ?? "average";
   if (!["average", "last", "none"].includes(updateCost)) throw new AppError("INVALID_UPDATE_COST", "Cara update HPP tidak dikenal.");

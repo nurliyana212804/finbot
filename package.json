@@ -1,5 +1,5 @@
 {
-  "name": "finbot",
+  "name": "catetin",
   "version": "1.0.0",
   "description": "Bot Telegram + Mini App pencatatan keuangan usaha (kas, omzet, laba rugi, stok) di Cloudflare Workers + D1",
   "private": true,

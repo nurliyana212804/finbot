@@ -237,6 +237,7 @@ export const api = {
   summary: () => req<Summary>("GET", "/reports/summary"),
 
   listCash: (q: { from: string; to: string; direction?: Direction; page?: number }) => req<Page<CashRow>>("GET", `/cash${qs(q)}`),
+  cashSummary: (from: string, to: string) => req<CashByAccount>("GET", `/cash/summary${qs({ from, to })}`),
   createCash: (b: { uid: string; tanggal: string; direction: Direction; amount: number; category_id: number; account_id: number; description: string | null }) =>
     req<CashRow>("POST", "/cash", b),
   transfer: (b: { uid: string; tanggal: string; amount: number; from_account_id: number; to_account_id: number; description: string | null }) =>
@@ -259,6 +260,7 @@ export const api = {
   products: (q?: string) => req<Product[]>("GET", `/products${qs({ q })}`),
   createProduct: (b: ProductInput & { opening_stock?: number }) => req<Product>("POST", "/products", b),
   updateProduct: (id: number, b: Partial<ProductInput>) => req<Product>("PATCH", `/products/${id}`, b),
+  deleteProduct: (id: number) => req<unknown>("DELETE", `/products/${id}`),
   setStock: (id: number, actual: number, note: string | null) => req<{ product: Product; change: number }>("POST", `/products/${id}/stock`, { actual, note }),
   movements: (id: number) => req<StockMovement[]>("GET", `/products/${id}/movements`),
   purchases: (q: { from: string; to: string; page?: number }) => req<Page<PurchaseRow>>("GET", `/purchases${qs(q)}`),
@@ -347,4 +349,14 @@ export interface PurchaseDetail extends PurchaseRow {
   items: { id: number; product_id: number; product_name: string; qty: number; unit_cost?: number; line_total: number }[];
   hppChanges?: { product_id: number; name: string; before: number; after: number }[];
   warnings: string[];
+}
+
+/** Kas masuk/keluar per akun (tanpa transfer). `saldo` hanya untuk owner/admin. */
+export interface CashByAccount {
+  from: string;
+  to: string;
+  totalMasuk: number;
+  totalKeluar: number;
+  totalSaldo?: number;
+  akun: { id: number; name: string; masuk: number; keluar: number; saldo?: number }[];
 }

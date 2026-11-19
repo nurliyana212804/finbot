@@ -4,6 +4,7 @@
  * Semua fungsi di sini mensyaratkan feature_stock = '1'.
  */
 import { AppError } from "../lib/errors";
+import { txDateError } from "../lib/date";
 import type { Actor } from "./cash";
 import { requireStock } from "./features";
 import type { Product } from "./products";
@@ -42,6 +43,8 @@ export async function setStockCount(
   assertAdmin(actor);
   await requireStock(db);
   if (!Number.isSafeInteger(actual) || Math.abs(actual) > MAX_STOCK) throw new AppError("INVALID_QTY", "Jumlah stok harus bilangan bulat.");
+  const dateErr = txDateError(input.tanggal);
+  if (dateErr) throw new AppError("INVALID_DATE", dateErr);
   const p = await db.prepare("SELECT * FROM products WHERE id = ?1 AND is_active = 1").bind(productId).first<Product>();
   if (!p) throw new AppError("NOT_FOUND", "Produk tidak ditemukan.", 404);
   if (!p.track_stock) throw new AppError("NOT_TRACKED", "Produk ini tidak dilacak stoknya (jasa). Aktifkan \"Lacak stok\" dulu.", 409);
